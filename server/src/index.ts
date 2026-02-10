@@ -151,8 +151,9 @@ const startServer = async () => {
     send(ws, { type: "room_list", rooms: toRoomInfo() });
 
     ws.on("message", (raw) => {
-      const parsed = safeParse(raw.toString());
-      if (!parsed) return;
+      try {
+        const parsed = safeParse(raw.toString());
+        if (!parsed) return;
 
       if (parsed.type === "join") {
         const nameInput = sanitizeText(parsed.name, 16);
@@ -237,7 +238,7 @@ const startServer = async () => {
 
       if (parsed.type === "message") {
         const client = clients.get(ws);
-        if (!client) return;
+        if (!client || !client.room) return;
         const text = sanitizeText(parsed.text, 300);
         if (!text) return;
         const timestamp = now();
@@ -271,7 +272,7 @@ const startServer = async () => {
 
       if (parsed.type === "typing") {
         const client = clients.get(ws);
-        if (!client) return;
+        if (!client || !client.room) return;
         broadcastRoom(client.room, {
           type: "typing",
           userId: client.id,
@@ -282,7 +283,7 @@ const startServer = async () => {
 
       if (parsed.type === "nudge") {
         const client = clients.get(ws);
-        if (!client) return;
+        if (!client || !client.room) return;
         const timestamp = now();
         if (timestamp - client.lastNudgeAt < 10_000) return;
         client.lastNudgeAt = timestamp;
@@ -339,6 +340,10 @@ const startServer = async () => {
           updateRoomList();
         }
         return;
+      }
+      } catch (error) {
+        console.error("[ws] message handler error", error);
+        send(ws, { type: "system", text: "Server error. Try again.", ts: now() });
       }
     });
 

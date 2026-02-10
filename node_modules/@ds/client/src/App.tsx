@@ -322,7 +322,7 @@ export default function App() {
     });
 
     ws.addEventListener("error", () => {
-      ws.close();
+      setStatus("reconnecting");
     });
   }, [handleServerEvent, sendEvent]);
 
