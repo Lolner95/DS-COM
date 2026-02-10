@@ -1,0 +1,17 @@
+{
+  "name": "ds-chat-mvp",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c green,cyan \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
+    "build": "npm run build --workspace shared && npm run build --workspace server && npm run build --workspace client",
+    "start": "npm run start --workspace server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
