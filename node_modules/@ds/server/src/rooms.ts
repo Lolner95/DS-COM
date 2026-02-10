@@ -6,12 +6,19 @@ export type RoomDef = {
   capacity: number;
 };
 
-export const roomDefs: RoomDef[] = [
+export const defaultRooms: RoomDef[] = [
   { id: "room-a", name: "Chat Room A", letter: "A", capacity: 16 },
   { id: "room-b", name: "Chat Room B", letter: "B", capacity: 16 },
   { id: "room-c", name: "Chat Room C", letter: "C", capacity: 16 },
   { id: "room-d", name: "Chat Room D", letter: "D", capacity: 16 }
 ];
+
+export const roomDefs: RoomDef[] = [...defaultRooms];
+
+export const setRooms = (rooms: RoomDef[]) => {
+  roomDefs.length = 0;
+  roomDefs.push(...rooms);
+};
 
 const slugify = (value: string) =>
   value

@@ -15,8 +15,13 @@ export type UserInfo = {
   room: string;
 };
 
+export type ChatHistoryItem =
+  | { kind: "message"; id: string; user: UserInfo; text: string; ts: number }
+  | { kind: "system"; text: string; ts: number };
+
 export type ServerToClientEvent =
   | { type: "room_list"; rooms: RoomInfo[] }
+  | { type: "history"; roomId: string; items: ChatHistoryItem[] }
   | { type: "user_list"; users: UserInfo[] }
   | { type: "message"; id: string; user: UserInfo; text: string; ts: number }
   | { type: "typing"; userId: string; isTyping: boolean }

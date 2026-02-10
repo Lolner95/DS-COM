@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  ChatHistoryItem,
   ClientToServerEvent,
   RoomInfo,
   ServerToClientEvent,
@@ -182,6 +183,12 @@ export default function App() {
       switch (event.type) {
         case "room_list":
           setRooms(event.rooms.length ? event.rooms : fallbackRooms);
+          return;
+        case "history":
+          messagesByRoomRef.current[event.roomId] = event.items as ChatItem[];
+          if (roomRef.current === event.roomId) {
+            setMessages(event.items as ChatItem[]);
+          }
           return;
         case "user_list":
           setUsers(event.users);
