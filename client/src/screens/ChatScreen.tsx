@@ -129,7 +129,11 @@ export default function ChatScreen({
           <div className="chat-title ds-title-bar">{roomName}</div>
           <div className="chat-status">
             <span className={`status-dot ${status}`}></span>
-            {status === "connected" ? "Connected" : "Reconnecting..."}
+            {status === "connected"
+              ? "Connected"
+              : status === "reconnecting"
+                ? "Reconnecting..."
+                : "Disconnected"}
           </div>
           <button
             className="chat-self"

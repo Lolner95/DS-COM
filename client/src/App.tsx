@@ -18,7 +18,16 @@ const STORAGE_AVATAR = "ds_avatar";
 const STORAGE_MUTE = "ds_mute";
 const STORAGE_CLIENT_KEY = "ds_client_key";
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8080";
+const resolveWsUrl = () => {
+  const configured = import.meta.env.VITE_WS_URL;
+  if (configured) return configured;
+  if (import.meta.env.DEV) return "ws://localhost:8080";
+  if (typeof window === "undefined") return "ws://localhost:8080";
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/ws`;
+};
+
+const WS_URL = resolveWsUrl();
 
 const fallbackRooms: RoomInfo[] = [
   { id: "room-a", name: "Chat Room A", letter: "A", count: 3, capacity: 16, signal: 3 },
@@ -283,11 +292,25 @@ export default function App() {
   const connect = useCallback(() => {
     if (reconnectRef.current) {
       window.clearTimeout(reconnectRef.current);
+      reconnectRef.current = null;
     }
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
 
+    const scheduleReconnect = () => {
+      if (wsRef.current !== ws) return;
+      if (reconnectRef.current) return;
+      setStatus("reconnecting");
+      reconnectAttempts.current += 1;
+      const delay = Math.min(8000, 800 * reconnectAttempts.current);
+      reconnectRef.current = window.setTimeout(() => {
+        reconnectRef.current = null;
+        connect();
+      }, delay);
+    };
+
     ws.addEventListener("open", () => {
+      if (wsRef.current !== ws) return;
       reconnectAttempts.current = 0;
       setStatus("connected");
       if (nameRef.current && roomRef.current) {
@@ -302,6 +325,7 @@ export default function App() {
     });
 
     ws.addEventListener("message", (event) => {
+      if (wsRef.current !== ws) return;
       const raw = typeof event.data === "string" ? event.data : "";
       if (!raw) return;
       try {
@@ -315,14 +339,20 @@ export default function App() {
     });
 
     ws.addEventListener("close", () => {
-      setStatus("reconnecting");
-      reconnectAttempts.current += 1;
-      const delay = Math.min(8000, 800 * reconnectAttempts.current);
-      reconnectRef.current = window.setTimeout(connect, delay);
+      scheduleReconnect();
     });
 
     ws.addEventListener("error", () => {
-      setStatus("reconnecting");
+      if (wsRef.current !== ws) return;
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        try {
+          ws.close();
+        } catch {
+          scheduleReconnect();
+        }
+      } else {
+        scheduleReconnect();
+      }
     });
   }, [handleServerEvent, sendEvent]);
 
