@@ -10,6 +10,8 @@ type DbData = {
   messages: Record<string, ChatHistoryItem[]>;
 };
 
+const HISTORY_LIMIT = 2000;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, "../data");
@@ -73,7 +75,7 @@ export const getProfile = (name: string) => db.profiles[name]?.avatar ?? "";
 
 export const appendHistory = (roomId: string, item: ChatHistoryItem) => {
   const history = db.messages[roomId] ?? [];
-  const next = [...history, item].slice(-200);
+  const next = [...history, item].slice(-HISTORY_LIMIT);
   db.messages[roomId] = next;
   scheduleSave();
 };

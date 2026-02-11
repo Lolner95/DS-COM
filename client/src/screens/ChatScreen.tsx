@@ -35,6 +35,11 @@ const formatTime = (ts: number) =>
 
 const isImageAvatar = (value: string) => value.startsWith("data:image");
 
+const clampName = (value: string, max = 12) => {
+  if (value.length <= max) return value;
+  return `${value.slice(0, Math.max(0, max - 1))}…`;
+};
+
 export default function ChatScreen({
   name,
   selfAvatar,
@@ -289,7 +294,9 @@ export default function ChatScreen({
                       </span>
                     );
                   })()}
-                  <span className="user-name">{user.name}</span>
+                  <span className="user-name" title={user.name}>
+                    {clampName(user.name)}
+                  </span>
                 </div>
               ))}
             </div>

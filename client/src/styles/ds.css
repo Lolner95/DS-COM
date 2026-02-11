@@ -1,16 +1,21 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
+
 :root {
   color-scheme: light;
-  --bg: #d7dce3;
-  --panel: #eef1f5;
-  --row: #f6f7f9;
-  --border: #8a9099;
-  --text: #2b2f36;
-  --accent: #2db24a;
+  --bg: #dad6cc;
+  --panel: #f1ede3;
+  --row: #f8f4ea;
+  --border: #7f776c;
+  --text: #2b2a25;
+  --accent: #2f9c44;
   --highlight: #ffffff;
-  --shadow: #b5bcc6;
-  --panel-dark: #d8dee6;
-  --panel-light: #f2f4f7;
-  --ds-blue: #6aa3b8;
+  --shadow: #b8b1a7;
+  --panel-dark: #e3ded3;
+  --panel-light: #f7f3ea;
+  --ds-blue: #6a93a6;
+  --radius: 1px;
+  --font-ui: "Press Start 2P", Tahoma, Verdana, "MS Sans Serif", Geneva,
+    system-ui, sans-serif;
 }
 
 *,
@@ -21,12 +26,16 @@
 
 body {
   margin: 0;
-  font-family: Tahoma, Verdana, "MS Sans Serif", system-ui, sans-serif;
+  font-family: var(--font-ui);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   text-rendering: optimizeSpeed;
   -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-kerning: none;
+  font-feature-settings: "liga" 0;
+  letter-spacing: 0;
 }
 
 body::before {
@@ -51,28 +60,55 @@ body::before {
   pointer-events: none;
 }
 
+.ds-parallax {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ds-parallax-layer {
+  position: absolute;
+  inset: -20%;
+  background-repeat: repeat;
+  animation: ds-parallax-shift var(--speed, 120s) linear infinite;
+  animation-timing-function: steps(var(--steps, 192), end);
+  opacity: 0.55;
+  will-change: transform;
+  image-rendering: pixelated;
+}
+
+
+@keyframes ds-parallax-shift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(var(--shift), var(--shift), 0);
+  }
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-}
-
-.app-shell * {
-  image-rendering: pixelated;
+  position: relative;
+  z-index: 1;
 }
 
 .screen {
-  width: min(960px, 100%);
+  width: min(1040px, 100%);
 }
 
 .ds-panel {
-  background: linear-gradient(180deg, var(--panel-light) 0%, var(--panel-dark) 100%);
+  background: var(--panel);
   border: 2px solid var(--border);
-  border-radius: 2px;
+  border-radius: var(--radius);
   padding: 20px;
-  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 #9aa2ad;
+  box-shadow: inset 0 1px 0 var(--highlight), inset 0 -1px 0 #bdb6ac;
 }
 
 .title {
@@ -85,17 +121,17 @@ body::before {
   display: inline-block;
   padding: 4px 8px;
   border: 2px solid var(--border);
-  border-radius: 2px;
-  background: #e7ebf1;
-  box-shadow: inset 0 1px 0 #ffffff, inset 0 -1px 0 #b9c0cb;
+  border-radius: var(--radius);
+  background: var(--panel-light);
+  box-shadow: inset 0 1px 0 #ffffff, inset 0 -1px 0 #c5beb3;
 }
 
 .ds-input {
   width: 100%;
   padding: 10px 12px;
   border: 2px solid var(--border);
-  border-radius: 2px;
-  background: #f9fafb;
+  border-radius: var(--radius);
+  background: #fbf8f1;
   font-size: 14px;
   font-family: inherit;
   outline: none;
@@ -108,9 +144,9 @@ body::before {
 
 .ds-button {
   border: 2px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 8px 16px;
-  background: linear-gradient(180deg, #fefefe 0%, #e9edf2 100%);
+  background: var(--panel-light);
   color: var(--text);
   font-size: 14px;
   font-family: inherit;
@@ -411,25 +447,27 @@ body::before {
 }
 
 .room-signal .signal-box {
-  width: 36px;
-  height: 24px;
-  border: 2px solid #5c626b;
-  border-radius: 2px;
-  padding: 4px;
+  width: 30px;
+  height: 18px;
+  border: 1px solid #1f2326;
+  border-radius: 4px;
+  padding: 3px;
   display: flex;
   align-items: flex-end;
-  gap: 3px;
-  background: #1f2326;
+  gap: 2px;
+  background: #2a2f33;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .signal-bar {
   width: 4px;
-  background: #2b2f36;
-  border-radius: 2px;
+  background: #4d545b;
+  border-radius: 1px;
 }
 
 .signal-bar.on {
-  background: var(--accent);
+  background: #dff3e4;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
 .bottom-bar {
@@ -488,6 +526,20 @@ body::before {
 
 .status-dot.connected {
   background: var(--accent);
+  box-shadow: 0 0 6px rgba(45, 178, 74, 0.35);
+  animation: ds-led-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes ds-led-pulse {
+  0%,
+  100% {
+    opacity: 0.9;
+    box-shadow: 0 0 6px rgba(45, 178, 74, 0.35);
+  }
+  50% {
+    opacity: 0.5;
+    box-shadow: 0 0 2px rgba(45, 178, 74, 0.2);
+  }
 }
 
 .status-dot.reconnecting {
@@ -596,8 +648,8 @@ body::before {
 
 .message-bubble {
   border: 2px solid var(--border);
-  border-radius: 2px;
-  background: #f1f3f6;
+  border-radius: var(--radius);
+  background: #f6f2ea;
   padding: 8px 10px;
   font-size: 14px;
   line-height: 1.3;
@@ -613,9 +665,9 @@ body::before {
 
 .system-pill {
   padding: 4px 10px;
-  border-radius: 2px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: #eef3f7;
+  background: #f3efe6;
   font-size: 12px;
   color: #4a515c;
 }
@@ -638,8 +690,8 @@ body::before {
 
 .user-panel {
   border: 2px solid var(--border);
-  border-radius: 2px;
-  background: #fefefe;
+  border-radius: var(--radius);
+  background: #faf6ee;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -665,6 +717,13 @@ body::before {
   align-items: center;
   gap: 8px;
   font-size: 13px;
+}
+
+.user-row .user-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .emote {

@@ -6,6 +6,7 @@ import type {
   ServerToClientEvent,
   UserInfo
 } from "@ds/shared";
+import DSParallaxBackground from "./components/DSParallaxBackground";
 import NameScreen from "./screens/NameScreen";
 import RoomSelectScreen from "./screens/RoomSelectScreen";
 import ChatScreen, { type ChatItem } from "./screens/ChatScreen";
@@ -227,7 +228,7 @@ export default function App() {
 
   const appendMessage = useCallback((room: string, item: ChatItem) => {
     const history = messagesByRoomRef.current[room] ?? [];
-    const next = [...history, item].slice(-200);
+    const next = [...history, item].slice(-2000);
     messagesByRoomRef.current[room] = next;
     if (roomRef.current === room) {
       setMessages(next);
@@ -555,7 +556,9 @@ export default function App() {
   const currentRoom = rooms.find((room) => room.id === roomId) ?? rooms[0];
 
   return (
-    <div className={`app-shell ${nudgeActive ? "nudge" : ""}`}>
+    <>
+      <DSParallaxBackground />
+      <div className={`app-shell ${nudgeActive ? "nudge" : ""}`}>
       {screen === "name" && (
         <NameScreen
           initialName={name}
@@ -592,7 +595,8 @@ export default function App() {
           onAvatarFile={handleAvatarFile}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
