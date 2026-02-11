@@ -1,15 +1,20 @@
-export const roomDefs = [
-    { id: "room-a", name: "Chat Room A", letter: "A", capacity: 16 },
-    { id: "room-b", name: "Chat Room B", letter: "B", capacity: 16 },
-    { id: "room-c", name: "Chat Room C", letter: "C", capacity: 16 },
-    { id: "room-d", name: "Chat Room D", letter: "D", capacity: 16 }
+export const defaultRooms = [
+    { id: "room-a", name: "Chat Room A", letter: "A", capacity: 128 },
+    { id: "room-b", name: "Chat Room B", letter: "B", capacity: 128 },
+    { id: "room-c", name: "Chat Room C", letter: "C", capacity: 128 },
+    { id: "room-d", name: "Chat Room D", letter: "D", capacity: 128 }
 ];
+export const roomDefs = [...defaultRooms];
+export const setRooms = (rooms) => {
+    roomDefs.length = 0;
+    roomDefs.push(...rooms);
+};
 const slugify = (value) => value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "");
 export const getRoomById = (id) => roomDefs.find((room) => room.id === id);
-export const createRoom = (name) => {
+export const createRoom = (name, image) => {
     const trimmed = name.trim();
     if (!trimmed)
         return null;
@@ -30,7 +35,8 @@ export const createRoom = (name) => {
         id,
         name: trimmed,
         letter,
-        capacity: 16
+        image,
+        capacity: 128
     };
     roomDefs.push(newRoom);
     return newRoom;

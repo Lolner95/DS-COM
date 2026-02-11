@@ -1,10 +1,13 @@
 import { WebSocketServer } from "ws";
 import crypto from "crypto";
 import { createRoom, getRoomById, roomDefs } from "./rooms.js";
+import { appendHistory, getDb, getProfile, initDb, saveDb, setProfile } from "./db.js";
+import { censorProfanity, containsUrl } from "./moderation.js";
 const PORT = 8080;
+const HEARTBEAT_INTERVAL_MS = 5000;
 const clients = new Map();
+const clientKeys = new Map();
 const roomUsers = new Map();
-const wss = new WebSocketServer({ port: PORT });
 const now = () => Date.now();
 const toRoomInfo = () => roomDefs.map((room) => {
     const count = roomUsers.get(room.id)?.size ?? 0;
@@ -13,6 +16,7 @@ const toRoomInfo = () => roomDefs.map((room) => {
         id: room.id,
         name: room.name,
         letter: room.letter,
+        image: room.image,
         count,
         capacity: room.capacity,
         signal
@@ -24,6 +28,17 @@ const sanitizeText = (value, max) => {
     const cleaned = value
         .replace(/[\u0000-\u001F\u007F]/g, "")
         .replace(/\s+/g, " ")
+        .trim();
+    return cleaned.length > max ? cleaned.slice(0, max) : cleaned;
+};
+const sanitizeMessageText = (value, max) => {
+    if (typeof value !== "string")
+        return "";
+    const normalized = value.replace(/\r\n?/g, "\n");
+    const cleaned = normalized
+        .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
         .trim();
     return cleaned.length > max ? cleaned.slice(0, max) : cleaned;
 };
@@ -59,6 +74,24 @@ const broadcastAll = (event) => {
 const updateRoomList = () => {
     broadcastAll({ type: "room_list", rooms: toRoomInfo() });
 };
+const isNameTaken = (name, clientKey) => {
+    const target = name.toLowerCase();
+    for (const client of clients.values()) {
+        if (client.name.toLowerCase() === target && client.clientKey !== clientKey) {
+            return true;
+        }
+    }
+    return false;
+};
+const generateGuestName = () => {
+    let candidate = "";
+    for (let i = 0; i < 5; i += 1) {
+        candidate = `Guest${Math.floor(Math.random() * 900 + 100)}`;
+        if (!isNameTaken(candidate))
+            return candidate;
+    }
+    return `Guest${Date.now().toString().slice(-4)}`;
+};
 const sendUserList = (roomId) => {
     const users = [];
     for (const client of clients.values()) {
@@ -83,158 +116,264 @@ const leaveRoom = (client) => {
             roomUsers.delete(client.room);
         }
     }
-    broadcastRoom(client.room, {
+    const event = {
         type: "system",
         text: `${client.name} left the room.`,
         ts: now()
-    });
+    };
+    broadcastRoom(client.room, event);
+    appendHistory(client.room, { kind: "system", text: event.text, ts: event.ts });
     sendUserList(client.room);
     updateRoomList();
 };
-wss.on("connection", (ws) => {
-    send(ws, { type: "room_list", rooms: toRoomInfo() });
-    ws.on("message", (raw) => {
-        const parsed = safeParse(raw.toString());
-        if (!parsed)
-            return;
-        if (parsed.type === "join") {
-            const nameInput = sanitizeText(parsed.name, 16);
-            const avatarInput = sanitizeText(parsed.avatar, 12000);
-            const requestedRoom = sanitizeText(parsed.room, 32);
-            const room = getRoomById(requestedRoom)?.id ?? roomDefs[0].id;
-            let client = clients.get(ws);
-            if (!client) {
-                const userName = nameInput || `Guest${Math.floor(Math.random() * 900 + 100)}`;
-                client = {
-                    id: crypto.randomUUID(),
-                    name: userName,
-                    avatar: avatarInput || "#6a7a8c",
-                    room,
-                    ws,
-                    msgTimes: [],
-                    lastNudgeAt: 0
-                };
-                clients.set(ws, client);
-            }
-            else {
-                leaveRoom(client);
-                client.name = nameInput || client.name;
-                client.avatar = avatarInput || client.avatar;
-                client.room = room;
-            }
-            if (!roomUsers.has(room)) {
-                roomUsers.set(room, new Set());
-            }
-            roomUsers.get(room)?.add(client.id);
-            broadcastRoom(room, {
-                type: "system",
-                text: `${client.name} joined the room.`,
-                ts: now()
-            });
-            sendUserList(room);
-            updateRoomList();
-            return;
-        }
-        if (parsed.type === "message") {
-            const client = clients.get(ws);
-            if (!client)
-                return;
-            const text = sanitizeText(parsed.text, 300);
-            if (!text)
-                return;
-            const timestamp = now();
-            client.msgTimes = client.msgTimes.filter((t) => timestamp - t < 10000);
-            if (client.msgTimes.length >= 5)
-                return;
-            client.msgTimes.push(timestamp);
-            broadcastRoom(client.room, {
-                type: "message",
-                id: crypto.randomUUID(),
-                user: {
-                    id: client.id,
-                    name: client.name,
-                    avatar: client.avatar,
-                    room: client.room
-                },
-                text,
-                ts: timestamp
-            });
-            return;
-        }
-        if (parsed.type === "typing") {
-            const client = clients.get(ws);
-            if (!client)
-                return;
-            broadcastRoom(client.room, {
-                type: "typing",
-                userId: client.id,
-                isTyping: !!parsed.isTyping
-            });
-            return;
-        }
-        if (parsed.type === "nudge") {
-            const client = clients.get(ws);
-            if (!client)
-                return;
-            const timestamp = now();
-            if (timestamp - client.lastNudgeAt < 10000)
-                return;
-            client.lastNudgeAt = timestamp;
-            broadcastRoom(client.room, {
-                type: "nudge",
-                fromUser: {
-                    id: client.id,
-                    name: client.name,
-                    avatar: client.avatar,
-                    room: client.room
+const cleanupClient = (ws) => {
+    const client = clients.get(ws);
+    if (!client)
+        return;
+    leaveRoom(client);
+    clients.delete(ws);
+    if (client.clientKey) {
+        clientKeys.delete(client.clientKey);
+    }
+};
+const startServer = async () => {
+    await initDb();
+    const wss = new WebSocketServer({ port: PORT });
+    const heartbeat = setInterval(() => {
+        for (const ws of wss.clients) {
+            const socket = ws;
+            if (socket.isAlive === false) {
+                cleanupClient(ws);
+                try {
+                    ws.terminate();
                 }
-            });
-            broadcastRoom(client.room, {
-                type: "system",
-                text: `${client.name} sent a nudge!`,
-                ts: timestamp
-            });
-            return;
-        }
-        if (parsed.type === "leave") {
-            const client = clients.get(ws);
-            if (!client)
-                return;
-            const priorRoom = client.room;
-            leaveRoom(client);
-            client.room = "";
-            send(ws, { type: "room_list", rooms: toRoomInfo() });
-            if (priorRoom) {
-                sendUserList(priorRoom);
+                catch {
+                    // ignore terminate failures
+                }
+                continue;
             }
-            return;
-        }
-        if (parsed.type === "update_profile") {
-            const client = clients.get(ws);
-            if (!client)
-                return;
-            const avatarInput = sanitizeText(parsed.avatar, 12000);
-            if (avatarInput) {
-                client.avatar = avatarInput;
-                sendUserList(client.room);
+            socket.isAlive = false;
+            try {
+                ws.ping();
             }
-            return;
-        }
-        if (parsed.type === "create_room") {
-            const nameInput = sanitizeText(parsed.name, 24);
-            const created = createRoom(nameInput);
-            if (created) {
-                updateRoomList();
+            catch {
+                // ignore ping failures
             }
-            return;
         }
+    }, HEARTBEAT_INTERVAL_MS);
+    wss.on("connection", (ws) => {
+        const socket = ws;
+        socket.isAlive = true;
+        ws.on("pong", () => {
+            socket.isAlive = true;
+        });
+        send(ws, { type: "room_list", rooms: toRoomInfo() });
+        ws.on("message", (raw) => {
+            try {
+                const parsed = safeParse(raw.toString());
+                if (!parsed)
+                    return;
+                if (parsed.type === "join") {
+                    const nameInput = sanitizeText(parsed.name, 16);
+                    const avatarInput = sanitizeText(parsed.avatar, 120000);
+                    const requestedRoom = sanitizeText(parsed.room, 32);
+                    const clientKeyInput = sanitizeText(parsed.clientKey, 64);
+                    const room = getRoomById(requestedRoom)?.id ?? roomDefs[0].id;
+                    if (nameInput && isNameTaken(nameInput, clientKeyInput)) {
+                        send(ws, {
+                            type: "system",
+                            text: "Name already in use. Choose another.",
+                            ts: now()
+                        });
+                        return;
+                    }
+                    const priorByKey = clientKeyInput && clientKeys.has(clientKeyInput)
+                        ? clientKeys.get(clientKeyInput)
+                        : undefined;
+                    if (priorByKey && priorByKey.ws !== ws) {
+                        leaveRoom(priorByKey);
+                        clients.delete(priorByKey.ws);
+                        clientKeys.delete(clientKeyInput);
+                        try {
+                            priorByKey.ws.close();
+                        }
+                        catch {
+                            // ignore close failures
+                        }
+                    }
+                    let client = clients.get(ws);
+                    if (!client) {
+                        const userName = nameInput || generateGuestName();
+                        const storedAvatar = nameInput ? getProfile(userName) : "";
+                        client = {
+                            id: priorByKey?.id ?? crypto.randomUUID(),
+                            name: userName,
+                            avatar: avatarInput || storedAvatar || "#6a7a8c",
+                            room,
+                            clientKey: clientKeyInput || priorByKey?.clientKey || crypto.randomUUID(),
+                            ws,
+                            msgTimes: [],
+                            lastNudgeAt: 0
+                        };
+                        clients.set(ws, client);
+                    }
+                    else {
+                        leaveRoom(client);
+                        const nextName = nameInput || client.name;
+                        const storedAvatar = nextName ? getProfile(nextName) : "";
+                        client.name = nextName;
+                        client.avatar = avatarInput || storedAvatar || client.avatar;
+                        client.room = room;
+                        if (clientKeyInput) {
+                            client.clientKey = clientKeyInput;
+                        }
+                    }
+                    if (client.clientKey) {
+                        clientKeys.set(client.clientKey, client);
+                    }
+                    if (!roomUsers.has(room)) {
+                        roomUsers.set(room, new Set());
+                    }
+                    roomUsers.get(room)?.add(client.id);
+                    const joinEvent = {
+                        type: "system",
+                        text: `${client.name} joined the room.`,
+                        ts: now()
+                    };
+                    broadcastRoom(room, joinEvent);
+                    appendHistory(room, { kind: "system", text: joinEvent.text, ts: joinEvent.ts });
+                    const history = getDb().messages[room] ?? [];
+                    send(ws, { type: "history", roomId: room, items: history });
+                    sendUserList(room);
+                    updateRoomList();
+                    return;
+                }
+                if (parsed.type === "message") {
+                    const client = clients.get(ws);
+                    if (!client || !client.room)
+                        return;
+                    let text = sanitizeMessageText(parsed.text, 300);
+                    if (!text)
+                        return;
+                    if (containsUrl(text)) {
+                        send(ws, {
+                            type: "system",
+                            text: "Links are not allowed in chat.",
+                            ts: now()
+                        });
+                        return;
+                    }
+                    text = censorProfanity(text);
+                    const timestamp = now();
+                    client.msgTimes = client.msgTimes.filter((t) => timestamp - t < 10000);
+                    if (client.msgTimes.length >= 5)
+                        return;
+                    client.msgTimes.push(timestamp);
+                    const event = {
+                        type: "message",
+                        id: crypto.randomUUID(),
+                        user: {
+                            id: client.id,
+                            name: client.name,
+                            avatar: client.avatar,
+                            room: client.room
+                        },
+                        text,
+                        ts: timestamp
+                    };
+                    broadcastRoom(client.room, event);
+                    appendHistory(client.room, {
+                        kind: "message",
+                        id: event.id,
+                        user: event.user,
+                        text: event.text,
+                        ts: event.ts
+                    });
+                    return;
+                }
+                if (parsed.type === "typing") {
+                    const client = clients.get(ws);
+                    if (!client || !client.room)
+                        return;
+                    broadcastRoom(client.room, {
+                        type: "typing",
+                        userId: client.id,
+                        isTyping: !!parsed.isTyping
+                    });
+                    return;
+                }
+                if (parsed.type === "nudge") {
+                    const client = clients.get(ws);
+                    if (!client || !client.room)
+                        return;
+                    const timestamp = now();
+                    if (timestamp - client.lastNudgeAt < 10000)
+                        return;
+                    client.lastNudgeAt = timestamp;
+                    broadcastRoom(client.room, {
+                        type: "nudge",
+                        fromUser: {
+                            id: client.id,
+                            name: client.name,
+                            avatar: client.avatar,
+                            room: client.room
+                        }
+                    });
+                    const event = {
+                        type: "system",
+                        text: `${client.name} sent a nudge!`,
+                        ts: timestamp
+                    };
+                    broadcastRoom(client.room, event);
+                    appendHistory(client.room, { kind: "system", text: event.text, ts: event.ts });
+                    return;
+                }
+                if (parsed.type === "leave") {
+                    const client = clients.get(ws);
+                    if (!client)
+                        return;
+                    const priorRoom = client.room;
+                    leaveRoom(client);
+                    client.room = "";
+                    send(ws, { type: "room_list", rooms: toRoomInfo() });
+                    if (priorRoom) {
+                        sendUserList(priorRoom);
+                    }
+                    return;
+                }
+                if (parsed.type === "update_profile") {
+                    const client = clients.get(ws);
+                    if (!client)
+                        return;
+                    const avatarInput = sanitizeText(parsed.avatar, 120000);
+                    if (avatarInput) {
+                        client.avatar = avatarInput;
+                        setProfile(client.name, avatarInput);
+                        sendUserList(client.room);
+                    }
+                    return;
+                }
+                if (parsed.type === "create_room") {
+                    const nameInput = sanitizeText(parsed.name, 24);
+                    const imageInput = sanitizeText(parsed.image, 120000);
+                    const created = createRoom(nameInput, imageInput || undefined);
+                    if (created) {
+                        saveDb();
+                        updateRoomList();
+                    }
+                    return;
+                }
+            }
+            catch (error) {
+                console.error("[ws] message handler error", error);
+                send(ws, { type: "system", text: "Server error. Try again.", ts: now() });
+            }
+        });
+        ws.on("close", () => {
+            cleanupClient(ws);
+        });
     });
-    ws.on("close", () => {
-        const client = clients.get(ws);
-        if (client) {
-            leaveRoom(client);
-            clients.delete(ws);
-        }
-    });
-});
-console.log(`[server] ws listening on ${PORT}`);
+    wss.on("close", () => clearInterval(heartbeat));
+    console.log(`[server] ws listening on ${PORT}`);
+};
+void startServer();

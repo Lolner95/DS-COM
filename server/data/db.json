@@ -68,21 +68,6 @@
     "room-a": [
       {
         "kind": "system",
-        "text": "confused fox left the room.",
-        "ts": 1770776086667
-      },
-      {
-        "kind": "system",
-        "text": "confused fox joined the room.",
-        "ts": 1770776104992
-      },
-      {
-        "kind": "system",
-        "text": "confused fox left the room.",
-        "ts": 1770776111682
-      },
-      {
-        "kind": "system",
         "text": "confused fox joined the room.",
         "ts": 1770776127625
       },
@@ -1751,6 +1736,21 @@
         "kind": "system",
         "text": "Togy left the room.",
         "ts": 1770785675354
+      },
+      {
+        "kind": "system",
+        "text": "FoobarTheBarbari joined the room.",
+        "ts": 1770787484782
+      },
+      {
+        "kind": "system",
+        "text": "Feex joined the room.",
+        "ts": 1770787492072
+      },
+      {
+        "kind": "system",
+        "text": "confused fox joined the room.",
+        "ts": 1770787496092
       }
     ],
     "room-b": [

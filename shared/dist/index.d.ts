@@ -2,6 +2,7 @@ export type RoomInfo = {
     id: string;
     name: string;
     letter: string;
+    image?: string;
     count: number;
     capacity: number;
     signal: number;
@@ -12,9 +13,24 @@ export type UserInfo = {
     avatar: string;
     room: string;
 };
+export type ChatHistoryItem = {
+    kind: "message";
+    id: string;
+    user: UserInfo;
+    text: string;
+    ts: number;
+} | {
+    kind: "system";
+    text: string;
+    ts: number;
+};
 export type ServerToClientEvent = {
     type: "room_list";
     rooms: RoomInfo[];
+} | {
+    type: "history";
+    roomId: string;
+    items: ChatHistoryItem[];
 } | {
     type: "user_list";
     users: UserInfo[];
@@ -41,6 +57,7 @@ export type ClientToServerEvent = {
     name: string;
     room: string;
     avatar: string;
+    clientKey: string;
 } | {
     type: "message";
     text: string;
@@ -57,4 +74,5 @@ export type ClientToServerEvent = {
 } | {
     type: "create_room";
     name: string;
+    image?: string;
 };
