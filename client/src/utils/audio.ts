@@ -7,7 +7,7 @@ type Tone = {
 
 const makeTone = (
   ctx: AudioContext,
-  { freq, duration, type = "sine", gain = 0.08 }: Tone
+  { freq, duration, type = "sine", gain = 0.003 }: Tone
 ) => {
   const osc = ctx.createOscillator();
   const amp = ctx.createGain();
@@ -51,17 +51,17 @@ export const createAudioController = () => {
     playClick() {
       const current = ensure();
       if (!current) return;
-      makeTone(current, { freq: 420, duration: 0.06, type: "square", gain: 0.05 });
+      makeTone(current, { freq: 420, duration: 0.06, type: "square", gain: 0.003 });
     },
     playPing() {
       const current = ensure();
       if (!current) return;
-      makeTone(current, { freq: 860, duration: 0.08, type: "triangle", gain: 0.06 });
+      makeTone(current, { freq: 860, duration: 0.08, type: "triangle", gain: 0.004 });
     },
     playNudge() {
       const current = ensure();
       if (!current) return;
-      makeTone(current, { freq: 140, duration: 0.12, type: "sawtooth", gain: 0.08 });
+      makeTone(current, { freq: 140, duration: 0.12, type: "sawtooth", gain: 0.004 });
     }
   };
 };

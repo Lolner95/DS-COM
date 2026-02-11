@@ -9,6 +9,7 @@ import type {
 } from "@ds/shared";
 import { createRoom, getRoomById, roomDefs, type RoomDef } from "./rooms.js";
 import { appendHistory, getDb, getProfile, initDb, saveDb, setProfile } from "./db.js";
+import { censorProfanity, containsUrl } from "./moderation.js";
 
 type ClientState = {
   id: string;
@@ -22,6 +23,7 @@ type ClientState = {
 };
 
 const PORT = 8080;
+const HEARTBEAT_INTERVAL_MS = 5000;
 
 const clients = new Map<WebSocket, ClientState>();
 const clientKeys = new Map<string, ClientState>();
@@ -49,6 +51,17 @@ const sanitizeText = (value: unknown, max: number): string => {
   const cleaned = value
     .replace(/[\u0000-\u001F\u007F]/g, "")
     .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.length > max ? cleaned.slice(0, max) : cleaned;
+};
+
+const sanitizeMessageText = (value: unknown, max: number): string => {
+  if (typeof value !== "string") return "";
+  const normalized = value.replace(/\r\n?/g, "\n");
+  const cleaned = normalized
+    .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
   return cleaned.length > max ? cleaned.slice(0, max) : cleaned;
 };
@@ -143,11 +156,46 @@ const leaveRoom = (client: ClientState) => {
   updateRoomList();
 };
 
+const cleanupClient = (ws: WebSocket) => {
+  const client = clients.get(ws);
+  if (!client) return;
+  leaveRoom(client);
+  clients.delete(ws);
+  if (client.clientKey) {
+    clientKeys.delete(client.clientKey);
+  }
+};
+
 const startServer = async () => {
   await initDb();
   const wss = new WebSocketServer({ port: PORT });
+  const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+      const socket = ws as WebSocket & { isAlive?: boolean };
+      if (socket.isAlive === false) {
+        cleanupClient(ws);
+        try {
+          ws.terminate();
+        } catch {
+          // ignore terminate failures
+        }
+        continue;
+      }
+      socket.isAlive = false;
+      try {
+        ws.ping();
+      } catch {
+        // ignore ping failures
+      }
+    }
+  }, HEARTBEAT_INTERVAL_MS);
 
   wss.on("connection", (ws) => {
+    const socket = ws as WebSocket & { isAlive?: boolean };
+    socket.isAlive = true;
+    ws.on("pong", () => {
+      socket.isAlive = true;
+    });
     send(ws, { type: "room_list", rooms: toRoomInfo() });
 
     ws.on("message", (raw) => {
@@ -239,8 +287,17 @@ const startServer = async () => {
       if (parsed.type === "message") {
         const client = clients.get(ws);
         if (!client || !client.room) return;
-        const text = sanitizeText(parsed.text, 300);
+        let text = sanitizeMessageText(parsed.text, 300);
         if (!text) return;
+        if (containsUrl(text)) {
+          send(ws, {
+            type: "system",
+            text: "Links are not allowed in chat.",
+            ts: now()
+          });
+          return;
+        }
+        text = censorProfanity(text);
         const timestamp = now();
         client.msgTimes = client.msgTimes.filter((t) => timestamp - t < 10_000);
         if (client.msgTimes.length >= 5) return;
@@ -348,16 +405,10 @@ const startServer = async () => {
     });
 
     ws.on("close", () => {
-      const client = clients.get(ws);
-      if (client) {
-        leaveRoom(client);
-        clients.delete(ws);
-        if (client.clientKey) {
-          clientKeys.delete(client.clientKey);
-        }
-      }
+      cleanupClient(ws);
     });
   });
+  wss.on("close", () => clearInterval(heartbeat));
 
   console.log(`[server] ws listening on ${PORT}`);
 };

@@ -242,9 +242,10 @@ export default function ChatScreen({
             )}
             <div className="typing-indicator">{typingLabel}</div>
             <div className="chat-input">
-              <input
+              <textarea
                 className="ds-input"
                 value={text}
+                rows={2}
                 onChange={(event) => {
                   setText(event.target.value);
                   if (event.target.value) {
@@ -257,7 +258,7 @@ export default function ChatScreen({
                 maxLength={300}
                 placeholder="Type a message..."
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (event.key === "Enter" && !event.shiftKey && !event.altKey) {
                     event.preventDefault();
                     handleSend();
                   }

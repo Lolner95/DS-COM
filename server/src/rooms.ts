@@ -7,10 +7,10 @@ export type RoomDef = {
 };
 
 export const defaultRooms: RoomDef[] = [
-  { id: "room-a", name: "Chat Room A", letter: "A", capacity: 16 },
-  { id: "room-b", name: "Chat Room B", letter: "B", capacity: 16 },
-  { id: "room-c", name: "Chat Room C", letter: "C", capacity: 16 },
-  { id: "room-d", name: "Chat Room D", letter: "D", capacity: 16 }
+  { id: "room-a", name: "Chat Room A", letter: "A", capacity: 128 },
+  { id: "room-b", name: "Chat Room B", letter: "B", capacity: 128 },
+  { id: "room-c", name: "Chat Room C", letter: "C", capacity: 128 },
+  { id: "room-d", name: "Chat Room D", letter: "D", capacity: 128 }
 ];
 
 export const roomDefs: RoomDef[] = [...defaultRooms];
@@ -52,7 +52,7 @@ export const createRoom = (name: string, image?: string) => {
     name: trimmed,
     letter,
     image,
-    capacity: 16
+    capacity: 128
   };
   roomDefs.push(newRoom);
   return newRoom;

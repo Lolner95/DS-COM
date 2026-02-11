@@ -127,6 +127,37 @@ export default function App() {
   const typingTimeouts = useRef(new Map<string, number>());
   const [typingMap, setTypingMap] = useState<Record<string, boolean>>({});
   const audioRef = useRef(createAudioController());
+  const titleBlinkRef = useRef<number | null>(null);
+  const unreadRef = useRef(0);
+  const baseTitleRef = useRef(
+    typeof document === "undefined" ? "DS Chat MVP" : document.title
+  );
+
+  const stopTitleBlink = useCallback(() => {
+    if (titleBlinkRef.current) {
+      window.clearInterval(titleBlinkRef.current);
+      titleBlinkRef.current = null;
+    }
+    unreadRef.current = 0;
+    if (typeof document !== "undefined") {
+      document.title = baseTitleRef.current;
+    }
+  }, []);
+
+  const startTitleBlink = useCallback(() => {
+    if (typeof document === "undefined") return;
+    if (titleBlinkRef.current) return;
+    let showAlert = false;
+    titleBlinkRef.current = window.setInterval(() => {
+      showAlert = !showAlert;
+      if (showAlert) {
+        const count = unreadRef.current;
+        document.title = count > 1 ? `(${count}) New messages` : "New message";
+      } else {
+        document.title = baseTitleRef.current;
+      }
+    }, 1000);
+  }, []);
 
   const sendEvent = useCallback((event: ClientToServerEvent) => {
     const ws = wsRef.current;
@@ -139,6 +170,22 @@ export default function App() {
     audioRef.current.setMuted(mute);
     writeStorage(STORAGE_MUTE, String(mute));
   }, [mute]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handleFocus = () => stopTitleBlink();
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        stopTitleBlink();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [stopTitleBlink]);
 
   useEffect(() => {
     nameRef.current = name;
@@ -216,6 +263,10 @@ export default function App() {
           const isSelf = selfIdRef.current && event.user.id === selfIdRef.current;
           if (!isSelf) {
             audioRef.current.playClick();
+            if (typeof document !== "undefined" && document.hidden) {
+              unreadRef.current += 1;
+              startTitleBlink();
+            }
             if (
               nameRef.current &&
               event.text
