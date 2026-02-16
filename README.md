@@ -8,7 +8,7 @@ This tutorial walks you through running the project from a new git clone.
 
 ## 1) Clone the repository
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Lolner95/DS-COM
 cd DS-COM
 ```
 
