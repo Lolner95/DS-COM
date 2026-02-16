@@ -699,6 +699,20 @@ body::before {
   height: fit-content;
 }
 
+.mobile-online {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-online-toggle {
+  align-self: flex-start;
+}
+
+.mobile-user-panel {
+  width: 100%;
+}
+
 .panel-title {
   font-size: 12px;
   font-weight: 700;
@@ -785,12 +799,129 @@ body::before {
 }
 
 @media (max-width: 860px) {
+  .app-shell {
+    padding: 12px 10px;
+    align-items: stretch;
+  }
+
+  .ds-panel {
+    padding: 14px;
+  }
+
+  .chat-panel {
+    min-height: auto;
+  }
+
+  .chat-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .chat-title {
+    font-size: 14px;
+    word-break: break-word;
+  }
+
+  .chat-status {
+    font-size: 11px;
+  }
+
+  .chat-actions {
+    flex-wrap: wrap;
+  }
+
+  .chat-self {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .chat-body {
     grid-template-columns: 1fr;
   }
 
-  .user-panel {
+  .desktop-user-panel {
     display: none;
+  }
+
+  .mobile-online {
+    display: flex;
+  }
+
+  .chat-input {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-input .ds-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .room-row {
+    grid-template-columns: 56px 1fr;
+    grid-template-areas:
+      "tile name"
+      "tile capacity"
+      "tile signal";
+    gap: 8px;
+  }
+
+  .room-left {
+    grid-area: tile;
+  }
+
+  .room-center {
+    grid-area: name;
+  }
+
+  .room-right {
+    grid-area: capacity;
+  }
+
+  .room-signal {
+    grid-area: signal;
+    justify-self: flex-start;
+  }
+
+  .room-name {
+    font-size: 14px;
+  }
+
+  .room-create-row {
+    grid-template-columns: 1fr;
+  }
+
+  .room-create-row .ds-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .room-image-row {
+    grid-template-columns: 1fr;
+  }
+
+  .room-image-actions {
+    flex-wrap: wrap;
+  }
+
+  .bottom-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bottom-bar .ds-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .avatar-picker {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .avatar-controls {
+    justify-content: center;
   }
 }
 

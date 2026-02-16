@@ -59,6 +59,7 @@ export default function ChatScreen({
 }: Props) {
   const [text, setText] = useState("");
   const [atBottom, setAtBottom] = useState(true);
+  const [showMobileUsers, setShowMobileUsers] = useState(false);
   const typingTimer = useRef<number | null>(null);
   const typingActive = useRef(false);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -122,6 +123,26 @@ export default function ChatScreen({
   }, [typingNames]);
 
   const selfHasImage = isImageAvatar(selfAvatar);
+  const renderUserRow = (user: UserInfo) => {
+    const hasImage = isImageAvatar(user.avatar);
+    return (
+      <div className="user-row" key={user.id}>
+        <span
+          className={`avatar tiny ${hasImage ? "has-image" : ""}`}
+          style={
+            hasImage
+              ? { backgroundImage: `url(${user.avatar})` }
+              : { backgroundColor: user.avatar }
+          }
+        >
+          {!hasImage && user.name.slice(0, 1).toUpperCase()}
+        </span>
+        <span className="user-name" title={user.name}>
+          {clampName(user.name)}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div className="screen chat-screen">
@@ -183,6 +204,20 @@ export default function ChatScreen({
         />
         <div className="chat-body">
           <div className="chat-main">
+            <div className="mobile-online">
+              <button
+                className="ds-button tiny mobile-online-toggle"
+                onClick={() => setShowMobileUsers((prev) => !prev)}
+              >
+                {showMobileUsers ? "Hide online" : `Online (${users.length})`}
+              </button>
+              {showMobileUsers && (
+                <div className="user-panel mobile-user-panel">
+                  <div className="panel-title">Online</div>
+                  <div className="user-list">{users.map(renderUserRow)}</div>
+                </div>
+              )}
+            </div>
             <div className="chat-messages" ref={listRef} onScroll={handleScroll}>
               {messages.map((item) =>
                 item.kind === "system" ? (
@@ -274,32 +309,9 @@ export default function ChatScreen({
               </button>
             </div>
           </div>
-          <aside className="user-panel">
+          <aside className="user-panel desktop-user-panel">
             <div className="panel-title">Online</div>
-            <div className="user-list">
-              {users.map((user) => (
-                <div className="user-row" key={user.id}>
-                  {(() => {
-                    const hasImage = isImageAvatar(user.avatar);
-                    return (
-                      <span
-                        className={`avatar tiny ${hasImage ? "has-image" : ""}`}
-                        style={
-                          hasImage
-                            ? { backgroundImage: `url(${user.avatar})` }
-                            : { backgroundColor: user.avatar }
-                        }
-                      >
-                        {!hasImage && user.name.slice(0, 1).toUpperCase()}
-                      </span>
-                    );
-                  })()}
-                  <span className="user-name" title={user.name}>
-                    {clampName(user.name)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <div className="user-list">{users.map(renderUserRow)}</div>
           </aside>
         </div>
       </div>
